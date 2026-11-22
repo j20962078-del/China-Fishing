@@ -1,0 +1,66 @@
+name: 2. Собрать APK
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: build-apk
+  cancel-in-progress: true
+jobs:
+  check:
+    name: Статическая проверка кода (не компиляция)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/static_check.py .
+  build:
+    name: Сборка Android APK (Unity 6, IL2CPP, ARM64)
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Освободить место на диске
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          docker-images: false
+          swap-storage: true
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-Android-${{ hashFiles('Packages/manifest.json', 'ProjectSettings/ProjectVersion.txt') }}
+          restore-keys: Library-Android-
+      - name: Сборка APK
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: Android
+          unityVersion: 6000.0.23f1
+          buildMethod: ChinaFishing.EditorTools.ProjectBuilder.BuildApk
+          allowDirtyBuild: true
+          versioning: None
+      - name: Проверить, что APK создан
+        run: |
+          ls -la build/Android || true
+          test -f build/Android/ChinaFishing.apk
+      - name: Сохранить APK как артефакт
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChinaFishing-APK
+          path: build/Android/ChinaFishing.apk
+          if-no-files-found: error
+      - name: Опубликовать APK в Releases (скачать с телефона)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: China Fishing APK #${{ github.run_number }}
+          files: build/Android/ChinaFishing.apk

@@ -1,0 +1,19 @@
+name: 1. Получить файл активации Unity (один раз)
+on:
+  workflow_dispatch: {}
+jobs:
+  activation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Запрос файла активации (.alf)
+        id: getManualLicenseFile
+        uses: game-ci/unity-request-activation-file@v2
+        with:
+          unityVersion: 6000.0.23f1
+      - name: Сохранить файл активации
+        uses: actions/upload-artifact@v4
+        with:
+          name: Unity_activation_file
+          path: ${{ steps.getManualLicenseFile.outputs.filePath }}
